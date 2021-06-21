@@ -48,6 +48,7 @@ use frame_support::{
         constants::{WEIGHT_PER_MICROS, WEIGHT_PER_NANOS},
         Weight,
     },
+    PalletId,
 };
 use frame_system::{
     self as system, ensure_none, ensure_root, ensure_signed, offchain::SendTransactionTypes,
@@ -67,7 +68,7 @@ use sp_runtime::{
         InvalidTransaction, TransactionPriority, TransactionSource, TransactionValidity,
         TransactionValidityError, ValidTransaction,
     },
-    DispatchError, ModuleId, PerU16, Perbill, Percent, RuntimeDebug,
+    DispatchError, PerU16, Perbill, Percent, RuntimeDebug,
 };
 #[cfg(feature = "std")]
 use sp_runtime::{Deserialize, Serialize};
@@ -94,7 +95,7 @@ pub(crate) const LOG_TARGET: &'static str = "staking";
 #[macro_export]
 macro_rules! log {
 	($level:tt, $patter:expr $(, $values:expr)* $(,)?) => {
-		frame_support::debug::$level!(
+		sp_tracing::$level!(
 			target: crate::LOG_TARGET,
 			$patter $(, $values)*
 		)
@@ -126,7 +127,7 @@ pub type RewardPoint = u32;
 // Note: Maximum nomination limit is set here -- 16.
 generate_solution_type!(
     #[compact]
-    pub struct CompactAssignments::<NominatorIndex, ValidatorIndex, OffchainAccuracy>(16)
+    pub struct CompactAssignments::<VoterIndex = NominatorIndex, TargetIndex = ValidatorIndex, Accuracy = OffchainAccuracy>(16)
 );
 
 /// Accuracy used for on-chain election.
@@ -515,15 +516,15 @@ where
     >,
 {
     fn disable_validator(validator: &<T as frame_system::Config>::AccountId) -> Result<bool, ()> {
-        <pallet_session::Module<T>>::disable(validator)
+        <pallet_session::Pallet<T>>::disable(validator)
     }
 
     fn validators() -> Vec<<T as frame_system::Config>::AccountId> {
-        <pallet_session::Module<T>>::validators()
+        <pallet_session::Pallet<T>>::validators()
     }
 
     fn prune_historical_up_to(up_to: SessionIndex) {
-        <pallet_session::historical::Module<T>>::prune_up_to(up_to);
+        <pallet_session::historical::Pallet<T>>::prune_up_to(up_to);
     }
 }
 
@@ -616,7 +617,7 @@ pub trait Config: frame_system::Config + SendTransactionTypes<Call<Self>> {
 
     /// This pallet's module id. Used to derivate a dedicated account id to store era rewards for
     /// validators and nominators in.
-    type PalletId: Get<ModuleId>;
+    type PalletId: Get<PalletId>;
 
     /// Weight information for extrinsics in this pallet.
     type WeightInfo: WeightInfo;
@@ -1087,7 +1088,8 @@ decl_module! {
                 // either current session final based on the plan, or we're forcing.
                 (Self::is_current_session_final() || Self::will_era_be_forced())
             {
-                if let Some(next_session_change) = T::NextNewSession::estimate_next_new_session(now) {
+                let (maybe_next_session_change, weight) = T::NextNewSession::estimate_next_new_session(now);
+                if let Some(next_session_change) = maybe_next_session_change {
                     if let Some(remaining) = next_session_change.checked_sub(&now) {
                         if remaining <= T::ElectionLookahead::get() && !remaining.is_zero() {
                             // create snapshot.
@@ -1109,7 +1111,7 @@ decl_module! {
                 } else {
                     log!(warn, "💸 Estimating next session change failed.");
                 }
-                add_weight(0, 0, T::NextNewSession::weight(now))
+                add_weight(0, 0, weight)
             }
             // For `era_election_status`, `is_current_session_final`, `will_era_be_forced`
             add_weight(3, 0, 0);
@@ -1225,7 +1227,7 @@ decl_module! {
                 Err(Error::<T>::InsufficientValue)?
             }
 
-            system::Module::<T>::inc_consumers(&stash).map_err(|_| Error::<T>::BadState)?;
+            system::Pallet::<T>::inc_consumers(&stash).map_err(|_| Error::<T>::BadState)?;
 
             // You're auto-bonded forever, here. We might improve this by only bonding when
             // you actually validate/nominate and remove once you unbond __everything__.
@@ -2884,16 +2886,16 @@ impl<T: Config> Module<T> {
         <Validators<T>>::remove(stash);
         <Nominators<T>>::remove(stash);
 
-        system::Module::<T>::dec_consumers(stash);
+        system::Pallet::<T>::dec_consumers(stash);
 
         Ok(())
     }
 
     /// Clear all era information for given era.
     fn clear_era_information(era_index: EraIndex) {
-        <ErasStakers<T>>::remove_prefix(era_index);
-        <ErasStakersClipped<T>>::remove_prefix(era_index);
-        <ErasValidatorPrefs<T>>::remove_prefix(era_index);
+        <ErasStakers<T>>::remove_prefix(era_index, None);
+        <ErasStakersClipped<T>>::remove_prefix(era_index, None);
+        <ErasValidatorPrefs<T>>::remove_prefix(era_index, None);
         <ErasValidatorReward<T>>::remove(era_index);
         <ErasRewardPoints<T>>::remove(era_index);
         <ErasTotalStake<T>>::remove(era_index);
@@ -2996,28 +2998,28 @@ impl<T: Config> Module<T> {
 /// some session can lag in between the newest session planned and the latest session started.
 impl<T: Config> pallet_session::SessionManager<T::AccountId> for Module<T> {
     fn new_session(new_index: SessionIndex) -> Option<Vec<T::AccountId>> {
-        frame_support::debug::native::trace!(
+        sp_tracing::trace!(
             target: LOG_TARGET,
             "[{}] planning new_session({})",
-            <frame_system::Module<T>>::block_number(),
+            <frame_system::Pallet<T>>::block_number(),
             new_index
         );
         Self::new_session(new_index)
     }
     fn start_session(start_index: SessionIndex) {
-        frame_support::debug::native::trace!(
+        sp_tracing::trace!(
             target: LOG_TARGET,
             "[{}] starting start_session({})",
-            <frame_system::Module<T>>::block_number(),
+            <frame_system::Pallet<T>>::block_number(),
             start_index
         );
         Self::start_session(start_index)
     }
     fn end_session(end_index: SessionIndex) {
-        frame_support::debug::native::trace!(
+        sp_tracing::trace!(
             target: LOG_TARGET,
             "[{}] ending end_session({})",
-            <frame_system::Module<T>>::block_number(),
+            <frame_system::Pallet<T>>::block_number(),
             end_index
         );
         Self::end_session(end_index)
@@ -3065,7 +3067,7 @@ where
     }
     fn note_uncle(author: T::AccountId, _age: T::BlockNumber) {
         Self::reward_by_ids(vec![
-            (<pallet_authorship::Module<T>>::author(), 2),
+            (<pallet_authorship::Pallet<T>>::author(), 2),
             (author, 1),
         ])
     }
@@ -3124,11 +3126,7 @@ where
         >],
         slash_fraction: &[Perbill],
         slash_session: SessionIndex,
-    ) -> Result<Weight, ()> {
-        if !Self::can_report() {
-            return Err(());
-        }
-
+    ) -> Weight {
         let reward_proportion = SlashRewardFraction::get();
         let mut consumed_weight: Weight = 0;
         let mut add_db_reads_writes = |reads, writes| {
@@ -3140,7 +3138,7 @@ where
             add_db_reads_writes(1, 0);
             if active_era.is_none() {
                 // this offence need not be re-submitted.
-                return Ok(consumed_weight);
+                return consumed_weight;
             }
             active_era
                 .expect("value checked not to be `None`; qed")
@@ -3172,7 +3170,7 @@ where
             {
                 Some(&(ref slash_era, _)) => *slash_era,
                 // before bonding period. defensive - should be filtered out.
-                None => return Ok(consumed_weight),
+                None => return consumed_weight,
             }
         };
 
@@ -3239,11 +3237,7 @@ where
             }
         }
 
-        Ok(consumed_weight)
-    }
-
-    fn can_report() -> bool {
-        Self::era_election_status().is_closed()
+        consumed_weight
     }
 }
 

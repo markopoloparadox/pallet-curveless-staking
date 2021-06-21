@@ -383,7 +383,7 @@ pub fn prepare_submission<T: Config>(
 
     // compact encode the assignment.
     let compact = CompactAssignments::from_assignment(
-        low_accuracy_assignment,
+        &low_accuracy_assignment,
         nominator_index,
         validator_index,
     )

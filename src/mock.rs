@@ -26,7 +26,7 @@ use frame_support::{
         OneSessionHandler,
     },
     weights::{constants::RocksDbWeight, Weight},
-    IterableStorageMap, StorageDoubleMap, StorageMap, StorageValue,
+    IterableStorageMap, PalletId, StorageDoubleMap, StorageMap, StorageValue,
 };
 use sp_core::H256;
 use sp_io;
@@ -36,7 +36,6 @@ use sp_npos_elections::{
 use sp_runtime::{
     testing::{Header, TestXt, UintAuthorityId},
     traits::{IdentityLookup, Zero},
-    ModuleId,
 };
 use sp_staking::offence::{OffenceDetails, OnOffenceHandler};
 use std::{cell::RefCell, collections::HashSet};
@@ -103,11 +102,11 @@ frame_support::construct_runtime!(
         NodeBlock = Block,
         UncheckedExtrinsic = UncheckedExtrinsic,
     {
-        System: frame_system::{Module, Call, Config, Storage, Event<T>},
-        Timestamp: pallet_timestamp::{Module, Call, Storage, Inherent},
-        Balances: pallet_balances::{Module, Call, Storage, Config<T>, Event<T>},
-        Staking: staking::{Module, Call, Config<T>, Storage, Event<T>, ValidateUnsigned},
-        Session: pallet_session::{Module, Call, Storage, Event, Config<T>},
+        System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
+        Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
+        Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
+        Staking: staking::{Pallet, Call, Config<T>, Storage, Event<T>, ValidateUnsigned},
+        Session: pallet_session::{Pallet, Call, Storage, Event, Config<T>},
     }
 );
 
@@ -161,9 +160,12 @@ impl frame_system::Config for Test {
     type OnKilledAccount = ();
     type SystemWeightInfo = ();
     type SS58Prefix = ();
+    type OnSetCode = ();
 }
 impl pallet_balances::Config for Test {
     type MaxLocks = MaxLocks;
+    type MaxReserves = ();
+    type ReserveIdentifier = [u8; 8];
     type Balance = Balance;
     type Event = Event;
     type DustRemoval = ();
@@ -213,7 +215,7 @@ impl pallet_timestamp::Config for Test {
     type WeightInfo = ();
 }
 parameter_types! {
-    pub const StakingPalletId: ModuleId = ModuleId(*b"mockstak");
+    pub const StakingPalletId: PalletId = PalletId(*b"mockstak");
     pub const BondingDuration: EraIndex = 3;
     pub const MaxNominatorRewardedPerValidator: u32 = 64;
     pub const UnsignedPriority: u64 = 1 << 20;
@@ -694,7 +696,7 @@ pub(crate) fn maximum_payout_for_duration(era: EraIndex) -> Balance {
 }
 
 pub(crate) fn mint_rewards(amount: Balance) {
-    let imbalance = <pallet_balances::Module<Test> as Currency<AccountId>>::issue(amount);
+    let imbalance = <pallet_balances::Pallet<Test> as Currency<AccountId>>::issue(amount);
     Staking::on_unbalanced(imbalance);
 }
 
@@ -724,7 +726,7 @@ pub(crate) fn on_offence_in_era(
     let bonded_eras = crate::BondedEras::get();
     for &(bonded_era, start_session) in bonded_eras.iter() {
         if bonded_era == era {
-            let _ = Staking::on_offence(offenders, slash_fraction, start_session).unwrap();
+            let _ = Staking::on_offence(offenders, slash_fraction, start_session);
             return;
         } else if bonded_era > era {
             break;
@@ -736,8 +738,7 @@ pub(crate) fn on_offence_in_era(
             offenders,
             slash_fraction,
             Staking::eras_start_session_index(era).unwrap(),
-        )
-        .unwrap();
+        );
     } else {
         panic!("cannot slash in era {}", era);
     }
@@ -878,7 +879,7 @@ pub(crate) fn horrible_npos_solution(
     >(staked_assignment);
 
     let compact =
-        CompactAssignments::from_assignment(assignments_reduced, nominator_index, validator_index)
+        CompactAssignments::from_assignment(&assignments_reduced, nominator_index, validator_index)
             .unwrap();
 
     // winner ids to index
@@ -959,7 +960,7 @@ pub(crate) fn prepare_submission_with(
     };
 
     let compact =
-        CompactAssignments::from_assignment(assignments_reduced, nominator_index, validator_index)
+        CompactAssignments::from_assignment(&assignments_reduced, nominator_index, validator_index)
             .expect("Failed to create compact");
 
     // winner ids to index
@@ -1028,7 +1029,7 @@ pub(crate) fn staking_events() -> Vec<staking::Event<Test>> {
         .into_iter()
         .map(|r| r.event)
         .filter_map(|e| {
-            if let Event::staking(inner) = e {
+            if let Event::Staking(inner) = e {
                 Some(inner)
             } else {
                 None

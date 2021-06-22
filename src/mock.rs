@@ -164,8 +164,6 @@ impl frame_system::Config for Test {
 }
 impl pallet_balances::Config for Test {
     type MaxLocks = MaxLocks;
-    type MaxReserves = ();
-    type ReserveIdentifier = [u8; 8];
     type Balance = Balance;
     type Event = Event;
     type DustRemoval = ();
@@ -1029,7 +1027,7 @@ pub(crate) fn staking_events() -> Vec<staking::Event<Test>> {
         .into_iter()
         .map(|r| r.event)
         .filter_map(|e| {
-            if let Event::Staking(inner) = e {
+            if let Event::staking(inner) = e {
                 Some(inner)
             } else {
                 None

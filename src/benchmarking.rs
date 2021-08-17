@@ -24,7 +24,7 @@ use testing_utils::*;
 pub use frame_benchmarking::{account, benchmarks, whitelist_account, whitelisted_caller};
 use frame_support::traits::OnUnbalanced;
 use frame_system::RawOrigin;
-use sp_npos_elections::CompactSolution;
+use sp_npos_elections::NposSolution;
 use sp_runtime::traits::One;
 const SEED: u32 = 0;
 const MAX_SPANS: u32 = 100;

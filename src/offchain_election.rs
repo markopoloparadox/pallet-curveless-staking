@@ -25,9 +25,10 @@ use codec::Decode;
 use frame_support::{traits::Get, weights::Weight, IterableStorageMap};
 use frame_system::offchain::SubmitTransaction;
 use sp_npos_elections::{
-    reduce, to_support_map, Assignment, CompactSolution, ElectionResult, ElectionScore,
-    EvaluateSupport, ExtendedBalance,
+    reduce, to_support_map, Assignment, ElectionResult, ElectionScore, EvaluateSupport,
+    ExtendedBalance, NposSolution,
 };
+use sp_runtime::offchain::storage::{MutateStorageError, StorageRetrievalError};
 use sp_runtime::{offchain::storage::StorageValueRef, traits::TrailingZeroInput, RuntimeDebug};
 use sp_std::{convert::TryInto, prelude::*};
 
@@ -75,8 +76,9 @@ pub(crate) fn set_check_offchain_execution_status<T: Config>(
     let storage = StorageValueRef::persistent(&OFFCHAIN_HEAD_DB);
     let threshold = T::BlockNumber::from(OFFCHAIN_REPEAT);
 
-    let mutate_stat =
-        storage.mutate::<_, &'static str, _>(|maybe_head: Option<Option<T::BlockNumber>>| {
+    let mutate_stat = storage.mutate::<_, &'static str, _>(
+        |maybe_head: Result<Option<T::BlockNumber>, StorageRetrievalError>| {
+            let maybe_head = maybe_head.ok();
             match maybe_head {
                 Some(Some(head)) if now < head => Err("fork."),
                 Some(Some(head)) if now >= head && now <= head + threshold => {
@@ -91,16 +93,20 @@ pub(crate) fn set_check_offchain_execution_status<T: Config>(
                     Ok(now)
                 }
             }
-        });
+        },
+    );
 
-    match mutate_stat {
-        // all good
-        Ok(Ok(_)) => Ok(()),
-        // failed to write.
-        Ok(Err(_)) => Err("failed to write to offchain db."),
-        // fork etc.
-        Err(why) => Err(why),
-    }
+    /*     match mutate_stat {
+           Ok(_) => Ok(()),
+           Err(why) => Err(why.),
+       }
+    */
+
+    let _block_number = mutate_stat.map_err(|x| match x {
+        MutateStorageError::ConcurrentModification(_x) => "failed to write to offchain db.",
+        MutateStorageError::ValueFunctionFailed(x) => x,
+    })?;
+    Ok(())
 }
 
 /// The internal logic of the offchain worker of this module. This runs the phragmen election,

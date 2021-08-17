@@ -559,9 +559,9 @@ fn nominators_also_get_slashed_pro_rata() {
 
         let slash_amount = slash_percent * exposed_stake;
         let validator_share =
-            Perbill::from_rational_approximation(exposed_validator, exposed_stake) * slash_amount;
+            Perbill::from_rational(exposed_validator, exposed_stake) * slash_amount;
         let nominator_share =
-            Perbill::from_rational_approximation(exposed_nominator, exposed_stake) * slash_amount;
+            Perbill::from_rational(exposed_nominator, exposed_stake) * slash_amount;
 
         // both slash amounts need to be positive for the test to make sense.
         assert!(validator_share > 0);
@@ -4517,8 +4517,8 @@ fn claim_reward_at_the_last_era_and_no_double_claim_and_invalid_claim() {
         let init_balance_10 = Balances::total_balance(&10);
         let init_balance_100 = Balances::total_balance(&100);
 
-        let part_for_10 = Perbill::from_rational_approximation::<u32>(1000, 1125);
-        let part_for_100 = Perbill::from_rational_approximation::<u32>(125, 1125);
+        let part_for_10 = Perbill::from_rational::<u32>(1000, 1125);
+        let part_for_100 = Perbill::from_rational::<u32>(125, 1125);
 
         // Check state
         Payee::<Test>::insert(11, RewardDestination::Controller);

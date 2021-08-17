@@ -56,8 +56,8 @@ use frame_system::{
 use pallet_session::historical;
 use sp_npos_elections::{
     generate_solution_type, is_score_better, seq_phragmen, to_support_map, Assignment,
-    CompactSolution, ElectionResult as PrimitiveElectionResult, ElectionScore, EvaluateSupport,
-    ExtendedBalance, PerThing128, SupportMap, VoteWeight,
+    ElectionResult as PrimitiveElectionResult, ElectionScore, EvaluateSupport, ExtendedBalance,
+    NposSolution, PerThing128, SupportMap, VoteWeight,
 };
 use sp_runtime::{
     traits::{
@@ -87,7 +87,7 @@ pub use weights::WeightInfo;
 
 const STAKING_ID: LockIdentifier = *b"staking ";
 pub const MAX_UNLOCKING_CHUNKS: usize = 32;
-pub const MAX_NOMINATIONS: usize = <CompactAssignments as CompactSolution>::LIMIT;
+pub const MAX_NOMINATIONS: usize = <CompactAssignments as NposSolution>::LIMIT;
 
 pub(crate) const LOG_TARGET: &'static str = "staking";
 
@@ -2147,7 +2147,7 @@ impl<T: Config> Module<T> {
         // This is the fraction of the total reward that the validator and the
         // nominators will get.
         let validator_total_reward_part =
-            Perbill::from_rational_approximation(validator_reward_points, total_reward_points);
+            Perbill::from_rational(validator_reward_points, total_reward_points);
 
         // This is how much validator + nominators are entitled to.
         let validator_total_payout = validator_total_reward_part * era_payout;
@@ -2159,8 +2159,7 @@ impl<T: Config> Module<T> {
 
         let validator_leftover_payout = validator_total_payout - validator_commission_payout;
         // Now let's calculate how this is split to the validator.
-        let validator_exposure_part =
-            Perbill::from_rational_approximation(exposure.own, exposure.total);
+        let validator_exposure_part = Perbill::from_rational(exposure.own, exposure.total);
         let validator_staking_payout = validator_exposure_part * validator_leftover_payout;
 
         let validator_effective_payout = validator_staking_payout + validator_commission_payout;
@@ -2172,8 +2171,7 @@ impl<T: Config> Module<T> {
         // Lets now calculate how this is split to the nominators.
         // Reward only the clipped exposures. Note this is not necessarily sorted.
         for nominator in exposure.others.iter() {
-            let nominator_exposure_part =
-                Perbill::from_rational_approximation(nominator.value, exposure.total);
+            let nominator_exposure_part = Perbill::from_rational(nominator.value, exposure.total);
 
             let nominator_reward: BalanceOf<T> =
                 nominator_exposure_part * validator_leftover_payout;
@@ -2893,9 +2891,9 @@ impl<T: Config> Module<T> {
 
     /// Clear all era information for given era.
     fn clear_era_information(era_index: EraIndex) {
-        <ErasStakers<T>>::remove_prefix(era_index);
-        <ErasStakersClipped<T>>::remove_prefix(era_index);
-        <ErasValidatorPrefs<T>>::remove_prefix(era_index);
+        <ErasStakers<T>>::remove_prefix(era_index, None);
+        <ErasStakersClipped<T>>::remove_prefix(era_index, None);
+        <ErasValidatorPrefs<T>>::remove_prefix(era_index, None);
         <ErasValidatorReward<T>>::remove(era_index);
         <ErasRewardPoints<T>>::remove(era_index);
         <ErasTotalStake<T>>::remove(era_index);

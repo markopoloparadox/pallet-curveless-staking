@@ -24,12 +24,12 @@ use testing_utils::*;
 pub use frame_benchmarking::{account, benchmarks, whitelist_account, whitelisted_caller};
 use frame_support::traits::OnUnbalanced;
 use frame_system::RawOrigin;
-use sp_npos_elections::NposSolution;
 use sp_runtime::traits::One;
 const SEED: u32 = 0;
 const MAX_SPANS: u32 = 100;
 const MAX_VALIDATORS: u32 = 1000;
 const MAX_SLASHES: u32 = 1000;
+use temp::MAX_NOMINATIONS;
 
 // Add slashing spans to a user account. Not relevant for actual use, only to benchmark
 // read and write operations.

@@ -28,6 +28,7 @@ use rand_chacha::{
 };
 use sp_io::hashing::blake2_256;
 use sp_npos_elections::*;
+use temp::MAX_NOMINATIONS;
 
 const SEED: u32 = 0;
 

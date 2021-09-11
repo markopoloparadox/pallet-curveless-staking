@@ -56,8 +56,8 @@ use frame_system::{
 use pallet_session::historical;
 use sp_npos_elections::{
     generate_solution_type, is_score_better, seq_phragmen, to_support_map, Assignment,
-    ElectionResult as PrimitiveElectionResult, ElectionScore, EvaluateSupport, ExtendedBalance,
-    NposSolution, PerThing128, SupportMap, VoteWeight,
+    CompactSolution, ElectionResult as PrimitiveElectionResult, ElectionScore, EvaluateSupport,
+    ExtendedBalance, PerThing128, SupportMap, VoteWeight,
 };
 use sp_runtime::{
     traits::{
@@ -85,9 +85,22 @@ use sp_std::{
 };
 pub use weights::WeightInfo;
 
+mod temp {
+    use super::*;
+    generate_solution_type!(
+        #[compact]
+        pub struct NposSolution16::<
+            VoterIndex = u32,
+            TargetIndex = u16,
+            Accuracy = sp_runtime::PerU16,
+        >(16)
+    );
+    pub const MAX_NOMINATIONS: usize =
+        <NposSolution16 as sp_npos_elections::CompactSolution>::LIMIT as usize;
+}
+
 const STAKING_ID: LockIdentifier = *b"staking ";
 pub const MAX_UNLOCKING_CHUNKS: usize = 32;
-pub const MAX_NOMINATIONS: usize = <CompactAssignments as NposSolution>::LIMIT;
 
 pub(crate) const LOG_TARGET: &'static str = "staking";
 
@@ -1169,7 +1182,7 @@ decl_module! {
             // will always return `Ok`.
             // 1. Maximum sum of Vec<ChainAccuracy> must fit into `UpperOf<ChainAccuracy>`.
             assert!(
-                <usize as TryInto<UpperOf<ChainAccuracy>>>::try_into(MAX_NOMINATIONS)
+                <usize as TryInto<UpperOf<ChainAccuracy>>>::try_into(temp::MAX_NOMINATIONS)
                 .unwrap()
                 .checked_mul(<ChainAccuracy>::one().deconstruct().try_into().unwrap())
                 .is_some()
@@ -1177,7 +1190,7 @@ decl_module! {
 
             // 2. Maximum sum of Vec<OffchainAccuracy> must fit into `UpperOf<OffchainAccuracy>`.
             assert!(
-                <usize as TryInto<UpperOf<OffchainAccuracy>>>::try_into(MAX_NOMINATIONS)
+                <usize as TryInto<UpperOf<OffchainAccuracy>>>::try_into(temp::MAX_NOMINATIONS)
                 .unwrap()
                 .checked_mul(<OffchainAccuracy>::one().deconstruct().try_into().unwrap())
                 .is_some()
@@ -1478,7 +1491,7 @@ decl_module! {
             let ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
             let stash = &ledger.stash;
             ensure!(!targets.is_empty(), Error::<T>::EmptyTargets);
-            ensure!(targets.len() <= MAX_NOMINATIONS, Error::<T>::TooManyTargets);
+            ensure!(targets.len() <= temp::MAX_NOMINATIONS, Error::<T>::TooManyTargets);
 
             let old = Nominators::<T>::get(stash).map_or_else(Vec::new, |x| x.targets);
 

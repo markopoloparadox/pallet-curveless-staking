@@ -152,7 +152,7 @@ parameter_types! {
 }
 
 impl frame_system::Config for Test {
-    type BaseCallFilter = frame_support::traits::AllowAll;
+    type BaseCallFilter = TestBaseCallFilter;
     type BlockWeights = ();
     type BlockLength = ();
     type DbWeight = RocksDbWeight;

@@ -25,8 +25,8 @@ use codec::Decode;
 use frame_support::{traits::Get, weights::Weight, IterableStorageMap};
 use frame_system::offchain::SubmitTransaction;
 use sp_npos_elections::{
-    reduce, to_support_map, Assignment, CompactSolution, ElectionResult, ElectionScore,
-    EvaluateSupport, ExtendedBalance,
+    reduce, to_support_map, Assignment, ElectionResult, ElectionScore, EvaluateSupport,
+    ExtendedBalance, NposSolution,
 };
 use sp_runtime::offchain::storage::{MutateStorageError, StorageRetrievalError};
 use sp_runtime::{offchain::storage::StorageValueRef, traits::TrailingZeroInput, RuntimeDebug};

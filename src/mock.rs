@@ -22,7 +22,7 @@ use crate::*;
 use frame_support::{
     assert_ok, parameter_types,
     traits::{
-        Currency, ExistenceRequirement, FindAuthor, Get, OnFinalize, OnInitialize,
+        Contains, Currency, ExistenceRequirement, FindAuthor, Get, OnFinalize, OnInitialize,
         OneSessionHandler,
     },
     weights::{constants::RocksDbWeight, Weight},
@@ -110,6 +110,20 @@ frame_support::construct_runtime!(
     }
 );
 
+pub struct TestBaseCallFilter;
+impl Contains<Call> for TestBaseCallFilter {
+    fn contains(c: &Call) -> bool {
+        match *c {
+            // Transfer works. Use `transfer_keep_alive` for a call that doesn't pass the filter.
+            Call::Balances(pallet_balances::Call::transfer(..)) => true,
+            // For benchmarking, this acts as a noop call
+            Call::System(frame_system::Call::remark(..)) => true,
+            // For tests
+            _ => false,
+        }
+    }
+}
+
 /// Author of block is always 11
 pub struct Author11;
 impl FindAuthor<AccountId> for Author11 {
@@ -135,10 +149,11 @@ parameter_types! {
     pub static Period: BlockNumber = 5;
     pub static Offset: BlockNumber = 0;
     pub static MaxIterations: u32 = 0;
+    pub const MaxReserves: u32 = 50;
 }
 
 impl frame_system::Config for Test {
-    type BaseCallFilter = ();
+    type BaseCallFilter = TestBaseCallFilter;
     type BlockWeights = ();
     type BlockLength = ();
     type DbWeight = RocksDbWeight;
@@ -165,6 +180,8 @@ impl frame_system::Config for Test {
 impl pallet_balances::Config for Test {
     type MaxLocks = MaxLocks;
     type Balance = Balance;
+    type MaxReserves = MaxReserves;
+    type ReserveIdentifier = [u8; 8];
     type Event = Event;
     type DustRemoval = ();
     type ExistentialDeposit = ExistentialDeposit;
@@ -1027,7 +1044,7 @@ pub(crate) fn staking_events() -> Vec<staking::Event<Test>> {
         .into_iter()
         .map(|r| r.event)
         .filter_map(|e| {
-            if let Event::staking(inner) = e {
+            if let Event::Staking(inner) = e {
                 Some(inner)
             } else {
                 None

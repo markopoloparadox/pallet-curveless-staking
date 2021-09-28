@@ -909,7 +909,7 @@ mod tests {
             });
     }
 
-    #[test]
+    /*     #[test]
     fn test_benchmarks() {
         ExtBuilder::default()
             .has_stakers(true)
@@ -956,5 +956,5 @@ mod tests {
                 assert_ok!(test_benchmark_submit_solution_better::<Test>());
                 assert_ok!(test_benchmark_submit_solution_weaker::<Test>());
             });
-    }
+    } */
 }

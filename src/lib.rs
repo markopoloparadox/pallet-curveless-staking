@@ -1225,7 +1225,7 @@ decl_module! {
             }
 
             // reject a bond which is considered to be _dust_.
-            if value < T::MinimumStake::get() {
+            if value < T::Currency::minimum_balance() {
                 Err(Error::<T>::InsufficientValue)?
             }
 
@@ -1288,7 +1288,7 @@ decl_module! {
                 ledger.total += extra;
                 ledger.active += extra;
                 // last check: the new active amount of ledger must be more than ED.
-                ensure!(ledger.active >= T::MinimumStake::get(), Error::<T>::InsufficientValue);
+                ensure!(ledger.active >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
                 Self::deposit_event(RawEvent::Bonded(stash, extra));
                 Self::update_ledger(&controller, &ledger);
@@ -1343,7 +1343,7 @@ decl_module! {
                 ledger.active -= value;
 
                 // Avoid there being a dust balance left in the staking system.
-                if ledger.active < T::MinimumStake::get() {
+                if ledger.active < T::Currency::minimum_balance() {
                     value += ledger.active;
                     ledger.active = Zero::zero();
                 }
@@ -1397,7 +1397,7 @@ decl_module! {
                 ledger = ledger.consolidate_unlocked(current_era)
             }
 
-            let post_info_weight = if ledger.unlocking.is_empty() && ledger.active <= T::MinimumStake::get() {
+            let post_info_weight = if ledger.unlocking.is_empty() && ledger.active <= T::Currency::minimum_balance() {
                 // This account must have called `unbond()` with some value that caused the active
                 // portion to fall below existential deposit + will have no more unlocking chunks
                 // left. We can now safely remove all staking-related information.
@@ -1793,7 +1793,7 @@ decl_module! {
 
             let ledger = ledger.rebond(value);
             // last check: the new active amount of ledger must be more than ED.
-            ensure!(ledger.active >= T::MinimumStake::get(), Error::<T>::InsufficientValue);
+            ensure!(ledger.active >= T::Currency::minimum_balance(), Error::<T>::InsufficientValue);
 
             Self::update_ledger(&controller, &ledger);
             Ok(Some(
@@ -1859,7 +1859,7 @@ decl_module! {
         /// # </weight>
         #[weight = T::WeightInfo::reap_stash(*num_slashing_spans)]
         fn reap_stash(_origin, stash: T::AccountId, num_slashing_spans: u32) {
-            let at_minimum = T::Currency::total_balance(&stash) == T::MinimumStake::get();
+            let at_minimum = T::Currency::total_balance(&stash) == T::Currency::minimum_balance();
             ensure!(at_minimum, Error::<T>::FundedTarget);
             Self::kill_stash(&stash, num_slashing_spans)?;
             T::Currency::remove_lock(STAKING_ID, &stash);

@@ -235,7 +235,7 @@ parameter_types! {
     pub const UnsignedPriority: u64 = 1 << 20;
     pub const MinSolutionScoreBump: Perbill = Perbill::zero();
     pub OffchainSolutionWeightLimit: Weight = BlockWeights::get().max_block;
-    pub const MinimumStake: Balance = 1;
+    pub const MinimumStake: Balance = 2;
 }
 
 thread_local! {

@@ -1886,6 +1886,8 @@ fn bond_with_no_staked_value() {
         .minimum_validator_count(1)
         .build()
         .execute_with(|| {
+            frame_support::print("Hello!");
+
             // Can't bond with 1
             assert_noop!(
                 Staking::bond(Origin::signed(1), 2, 1, RewardDestination::Controller),
